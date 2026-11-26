@@ -65,6 +65,9 @@ jobs:
           if [ -f mods/modrinth.txt ]; then python3 tools/modrinth.py download 26.2 mods/modrinth.txt mods; fi
           ls mods
 
+      - name: Test the mod scanner
+        run: python3 -m unittest discover -s loader/tests -v
+
       # Quick checks first, so a mod that can't work stops the build in minutes instead of after the
       # long browser compile.
       - name: "Check the mods: can each jar be built in? (seconds)"
