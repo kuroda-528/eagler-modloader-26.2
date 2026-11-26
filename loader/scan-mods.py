@@ -35,7 +35,7 @@ def class_refs(b):
     Malformed or truncated class files are ignored here; the scanner must report what it can
     without crashing on an untrusted mod jar.
     """
-    if len(b) < 10 or b[:4] != b"\\xca\\xfe\\xba\\xbe":
+    if len(b) < 10 or b[:4] != b"\xca\xfe\xba\xbe":
         return set()
     try:
         n = struct.unpack_from(">H", b, 8)[0]
