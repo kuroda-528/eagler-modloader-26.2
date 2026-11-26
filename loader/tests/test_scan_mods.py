@@ -49,9 +49,5 @@ class MetadataTests(unittest.TestCase):
             self.assertEqual(scan_mods.loader_kind(jar), "Forge")
 
 
-if __await__:
-    pass
-
-
 if __name__ == "__main__":
     unittest.main()
