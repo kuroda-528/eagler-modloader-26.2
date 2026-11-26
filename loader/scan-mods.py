@@ -30,31 +30,55 @@ def matches(name, pattern):
     return name == pattern or name.startswith(pattern + "$")
 
 def class_refs(b):
-    """Class names referenced from a class file's constant pool."""
-    if b[:4] != b"\xca\xfe\xba\xbe":
+    """Class names referenced from a class file's constant pool.
+
+    Malformed or truncated class files are ignored here; the scanner must report what it can
+    without crashing on an untrusted mod jar.
+    """
+    if len(b) < 10 or b[:4] != b"\\xca\\xfe\\xba\\xbe":
         return set()
-    n = struct.unpack(">H", b[8:10])[0]
-    utf, classes = {}, []
-    i, k = 10, 1
-    while k < n:
-        tag = b[i]
-        if tag == 1:
-            ln = struct.unpack(">H", b[i + 1:i + 3])[0]
-            utf[k] = b[i + 3:i + 3 + ln].decode("utf-8", "replace"); i += 3 + ln
-        elif tag == 7:
-            classes.append(struct.unpack(">H", b[i + 1:i + 3])[0]); i += 3
-        elif tag in (3, 4): i += 5
-        elif tag in (5, 6): i += 9; k += 1
-        elif tag in (8, 16, 19, 20): i += 3
-        elif tag in (9, 10, 11, 12, 17, 18): i += 5
-        elif tag == 15: i += 4
-        else: return set()
-        k += 1
-    out = set()
-    for c in classes:
-        s = utf.get(c, "")
-        out.add(s.lstrip("[").removeprefix("L").removesuffix(";"))
-    return out
+    try:
+        n = struct.unpack_from(">H", b, 8)[0]
+        utf, classes = {}, []
+        i, k = 10, 1
+
+        def need(size):
+            if size < 0 or i + size > len(b):
+                raise ValueError("truncated constant pool")
+
+        while k < n:
+            need(1)
+            tag = b[i]
+            if tag == 1:
+                need(3)
+                ln = struct.unpack_from(">H", b, i + 1)[0]
+                need(3 + ln)
+                utf[k] = b[i + 3:i + 3 + ln].decode("utf-8", "replace")
+                i += 3 + ln
+            elif tag == 7:
+                need(3)
+                classes.append(struct.unpack_from(">H", b, i + 1)[0])
+                i += 3
+            elif tag in (3, 4):
+                need(5); i += 5
+            elif tag in (5, 6):
+                need(9); i += 9; k += 1
+            elif tag in (8, 16, 19, 20):
+                need(3); i += 3
+            elif tag in (9, 10, 11, 12, 17, 18):
+                need(5); i += 5
+            elif tag == 15:
+                need(4); i += 4
+            else:
+                return set()
+            k += 1
+
+        return {
+            utf[index].lstrip("[").removeprefix("L").removesuffix(";")
+            for index in classes if index in utf
+        }
+    except (IndexError, struct.error, ValueError):
+        return set()
 
 def loader_kind(zf):
     names = set(zf.namelist())
