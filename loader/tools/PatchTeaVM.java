@@ -42,7 +42,8 @@ public class PatchTeaVM {
 			else if (p.toString().endsWith("ReferenceResolver.class")) patchMissingAsWarnings(p);
 			else if (p.toString().endsWith("TConstructor.class") || p.toString().endsWith("TMethod.class")) patchAbstractCheck(p);
 			else if (p.toString().endsWith("TFiles.class")) patchCreateDirectories(p);
-			else if (p.toString().endsWith("TCharset.class")) patchCharsetAlias(p);\n\t\t\telse if (p.toString().endsWith("TStream.class")) patchStreamNullable(p);
+			else if (p.toString().endsWith("TCharset.class")) patchCharsetAlias(p);
+			else if (p.toString().endsWith("TStream.class")) patchStreamNullable(p);
 			else patchNullChecks(p);
 		}
 	}
@@ -150,7 +151,7 @@ public class PatchTeaVM {
 	/**
 	 * Java 9 Stream.ofNullable(T): return an empty stream for null, otherwise a one-element stream.
 	 * TeaVM 0.13.1's TStream classlib predates this Java API, so calls compiled from newer mods
-	 * otherwise become NoSuchMethodError at runtime.
+	 * otherwise become NoSuchMethodError at runtime. The implementation delegates to the existing empty/of factories.
 	 */
 	static void patchStreamNullable(Path p) throws Exception {
 		ClassReader cr = new ClassReader(Files.readAllBytes(p));
