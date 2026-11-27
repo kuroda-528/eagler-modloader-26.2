@@ -29,7 +29,7 @@ import org.objectweb.asm.Opcodes;
  * And TCharset (java.nio.charset.Charset): forName/isSupported accept "UTF8" for UTF-8, as the JDK does
  * (TOML and other config libraries ask for it by that name).
  * Usage: java PatchTeaVM CLASS_FILE... (NullCheckInsertion, TeaVM, ReferenceResolver, TConstructor,
- * TMethod, TFiles, TCharset; patched in place)
+ * TMethod, TFiles, TCharset, TStream; patched in place)
  */
 public class PatchTeaVM {
 	static final String CLS = "org/teavm/model/transformation/NullCheckInsertion";
@@ -42,7 +42,7 @@ public class PatchTeaVM {
 			else if (p.toString().endsWith("ReferenceResolver.class")) patchMissingAsWarnings(p);
 			else if (p.toString().endsWith("TConstructor.class") || p.toString().endsWith("TMethod.class")) patchAbstractCheck(p);
 			else if (p.toString().endsWith("TFiles.class")) patchCreateDirectories(p);
-			else if (p.toString().endsWith("TCharset.class")) patchCharsetAlias(p);
+			else if (p.toString().endsWith("TCharset.class")) patchCharsetAlias(p);\n\t\t\telse if (p.toString().endsWith("TStream.class")) patchStreamNullable(p);
 			else patchNullChecks(p);
 		}
 	}
@@ -145,6 +145,51 @@ public class PatchTeaVM {
 		if (n[0] == 0) throw new IllegalStateException("TFiles.createDirectories not found");
 		Files.write(p, cw.toByteArray());
 		System.out.println("patched " + p + ": createDirectories returns when the directory exists");
+	}
+
+	/**
+	 * Java 9 Stream.ofNullable(T): return an empty stream for null, otherwise a one-element stream.
+	 * TeaVM 0.13.1's TStream classlib predates this Java API, so calls compiled from newer mods
+	 * otherwise become NoSuchMethodError at runtime.
+	 */
+	static void patchStreamNullable(Path p) throws Exception {
+		ClassReader cr = new ClassReader(Files.readAllBytes(p));
+		ClassWriter cw = new ClassWriter(0);
+		final boolean[] found = { false };
+		final String stream = "org/teavm/classlib/java/util/stream/TStream";
+		cr.accept(new ClassVisitor(Opcodes.ASM9, cw) {
+			@Override
+			public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
+				if (name.equals("ofNullable") && desc.equals("(Ljava/lang/Object;)L" + stream + ";")) {
+					found[0] = true;
+				}
+				return super.visitMethod(access, name, desc, sig, ex);
+			}
+			@Override
+			public void visitEnd() {
+				if (!found[0]) {
+					MethodVisitor mv = super.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+							"ofNullable", "(Ljava/lang/Object;)L" + stream + ";",
+							"<T:Ljava/lang/Object;>(TT;)L" + stream + "<TT;>;", null);
+					mv.visitCode();
+					Label nonNull = new Label();
+					mv.visitVarInsn(Opcodes.ALOAD, 0);
+					mv.visitJumpInsn(Opcodes.IFNONNULL, nonNull);
+					mv.visitMethodInsn(Opcodes.INVOKESTATIC, stream, "empty", "()L" + stream + ";", false);
+					mv.visitInsn(Opcodes.ARETURN);
+					mv.visitLabel(nonNull);
+					mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+					mv.visitVarInsn(Opcodes.ALOAD, 0);
+					mv.visitMethodInsn(Opcodes.INVOKESTATIC, stream, "of", "(Ljava/lang/Object;)L" + stream + ";", false);
+					mv.visitInsn(Opcodes.ARETURN);
+					mv.visitMaxs(1, 1);
+					mv.visitEnd();
+				}
+				super.visitEnd();
+			}
+		}, 0);
+		Files.write(p, cw.toByteArray());
+		System.out.println("patched " + p + ": Stream.ofNullable(Object) added" + (found[0] ? " (already present)" : ""));
 	}
 
 	/** TCharset.forName/isSupported(String): "UTF8" (any case) becomes "UTF-8" first. */
