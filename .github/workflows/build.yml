@@ -171,6 +171,9 @@ jobs:
           python3 ../loader/inject-addons.py ../addons ../out/eaglercraft-26.2-modded.html
           grep -v '^#' ../eml/disabled-injectors.txt > ../out/turned-off-injectors.txt 2>/dev/null || true
 
+      - name: Prepare GitHub Pages entry point
+        run: cp out/eaglercraft-26.2-modded.html out/index.html
+
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
@@ -208,3 +211,28 @@ jobs:
             fi
           } > notes.md
           gh release create "$tag" out/*.html --title "$title" --notes-file notes.md "${kind[@]}"
+
+  deploy-pages:
+    name: Deploy playable HTML to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download built game
+        uses: actions/download-artifact@v4
+        with:
+          name: eaglercraft-26.2-modded
+          path: artifact
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifact/out
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
