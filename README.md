@@ -1,6 +1,6 @@
 # eagler-modloader-26.2
 
-**Work in progress.** Fabric mods, built into Eaglercraft 26.2.
+**Work in progress.** Fabric mods are checked and built into Eaglercraft 26.2; a separate exporter also creates Zeus Lua package drafts.
 
 Eaglercraft is Minecraft compiled to run in a web browser. A browser can't load a mod `.jar` while the game is running: the game is no longer Java code once it is in the browser. So this project does what Fabric does at startup **once, during the build**. It takes the Fabric mods in [`mods/`](mods), applies them to the game, and compiles one standalone HTML file with those mods built in. Mod Menu lists them in-game.
 
@@ -9,9 +9,16 @@ Eaglercraft is Minecraft compiled to run in a web browser. A browser can't load 
 1. Fork or copy this repository (keep it **public**; see *Build machines* below).
 2. Drop Fabric mod jars for **Minecraft 26.2** into `mods/`, with any mods they depend on.
 3. Commit. The **Build** action starts by itself (or run it from the *Actions* tab).
-4. After it finishes (about 40-60 minutes), download the HTML from **Releases**.
+4. After it finishes (about 40-60 minutes), download the HTML from **Releases** or open the GitHub Pages site.
+5. Download the **Zeus Lua packages** from the workflow artifact or the release assets.
 
 To remove a mod, delete its jar and build again.
+
+### Fabric → Zeus Lua export
+
+Every build now creates one `.zip` package per Fabric jar in `zeus-mods/`. Each package has a Zeus `metadata.json`, a `main.lua` entry file, a `conversion-report.json`, and safe `assets/<namespace>/` resources. The packages target Zeus Lua API 1 and Minecraft 26.2.
+
+**Important limitation:** this is a first-stage compatibility exporter, not a general Java-to-Lua compiler. Fabric Java bytecode, entrypoints, mixins, access wideners, and Java libraries cannot be converted into working Lua automatically by this tool. The generated Lua file is a clearly labelled starter that logs this limitation; the report lists the Fabric entrypoints and mixins that need a manual Lua implementation. Only metadata and supported resource assets are carried over. Do not assume a generated package reproduces the original Fabric mod's gameplay features.
 
 Mods on Modrinth can be listed instead of uploaded: put their slug (the last part of
 `modrinth.com/mod/<slug>`) on a line in `mods/modrinth.txt`. The build downloads the newest Fabric
