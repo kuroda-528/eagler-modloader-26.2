@@ -70,6 +70,11 @@ jobs:
 
       # Quick checks first, so a mod that can't work stops the build in minutes instead of after the
       # long browser compile.
+      - name: Export Fabric mods as Zeus Lua packages
+        run: |
+          python3 tools/fabric-to-zeus.py mods zeus-mods
+          cat zeus-mods/conversion-summary.json >> "$GITHUB_STEP_SUMMARY"
+
       - name: "Check the mods: can each jar be built in? (seconds)"
         run: |
           mkdir -p eml
@@ -182,6 +187,7 @@ jobs:
             out/
             eml/weave.log
             eml/gen.log
+            zeus-mods/
           retention-days: 14
 
       - name: Publish
@@ -210,7 +216,7 @@ jobs:
               echo; sed 's/^/- /' out/turned-off-injectors.txt
             fi
           } > notes.md
-          gh release create "$tag" out/*.html --title "$title" --notes-file notes.md "${kind[@]}"
+          gh release create "$tag" out/*.html zeus-mods/*.zip --title "$title" --notes-file notes.md "${kind[@]}"
 
   deploy-pages:
     name: Deploy playable HTML to GitHub Pages
